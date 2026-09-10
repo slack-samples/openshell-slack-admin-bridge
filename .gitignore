@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.env
+*.log
+
+# Local deployment config (admin allow-list + channel routing; environment-specific)
+config/admins.yaml
+
+# Local durable state store (bridge-owned; not source)
+state/
+*.state.json
+
+# Diagnostics + exported support bundles (may sit outside state/ if DIAGNOSTICS_PATH is set)
+diagnostics*.jsonl
+support-bundle*.jsonl
+
+# Local reference clone of the OpenShell runtime (not part of this app)
+.research/
+
+# OS / editor
+.DS_Store

@@ -1,0 +1,56 @@
+{
+  "name": "openshell-slack-admin-bridge",
+  "version": "0.1.0",
+  "description": "Slack admin approval bridge for OpenShell sandboxed agents (network-egress policy approvals)",
+  "license": "MIT",
+  "author": "Slack Technologies, Inc.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/slack-samples/openshell-slack-admin-bridge.git"
+  },
+  "homepage": "https://github.com/slack-samples/openshell-slack-admin-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/slack-samples/openshell-slack-admin-bridge/issues"
+  },
+  "keywords": [
+    "slack",
+    "slack-bolt",
+    "bolt",
+    "socket-mode",
+    "block-kit",
+    "openshell",
+    "grpc",
+    "approvals",
+    "sample"
+  ],
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "start:capture": "node dist/capture-main.js",
+    "dev": "tsx watch src/index.ts",
+    "dev:capture": "tsx watch src/capture-main.ts",
+    "dev:mock": "tsx watch src/mock-server.ts",
+    "seed:audit": "node --import tsx scripts/seed-audit-summary.ts",
+    "typecheck": "tsc --noEmit",
+    "support-bundle": "node --import tsx scripts/support-bundle.ts",
+    "test": "node --import tsx --test \"test/**/*.test.ts\""
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.0",
+    "@grpc/proto-loader": "^0.7.13",
+    "@slack/bolt": "^4.1.0",
+    "@slack/web-api": "^7.19.0",
+    "dotenv": "^16.4.0",
+    "pino": "^9.5.0",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
