@@ -1,0 +1,36 @@
+# Slack admin allow-list and channel routing for the OpenShell Slack Admin Bridge.
+# Copy to config/admins.yaml and edit. Slack user IDs look like U0123ABCD; channel
+# IDs look like C0123ABCD (right-click a channel in Slack -> View channel details).
+
+admins:
+  - slack_user_id: "U0000000000"
+    name: "Your Name"
+    role: "super_admin"   # "super_admin" or "admin"
+
+routing:
+  # Fallback channel when a workspace has no explicit mapping below.
+  default_channel: "C0000000000"
+  # Map an OpenShell workspace name to the Slack channel that receives its approvals.
+  workspace_channels:
+    default: "C0000000000"
+  # OPTIONAL channel for captured audit events. Capture (CAPTURE_SOURCES) always
+  # writes the App Home audit-activity summary; setting this opts INTO also posting
+  # the audit firehose to Slack. When set it MUST differ from every approval
+  # channel above, so the firehose can never land in an approval channel. Invite
+  # the bot. Leave it commented out to capture to the summary file only (no posts).
+  # audit_channel: "C1111111111"
+
+settings:
+  # Require a non-empty reason when rejecting a proposal (recommended for audit).
+  reject_reason_required: true
+  # Roles allowed to run destructive/batch actions (Undo, Clear, Approve-all).
+  destructive_roles: ["super_admin"]
+
+# Audit capture tuning. Optional; the audit feed captures every
+# event by default. This block is only needed to silence specific noise.
+# capture:
+#   # Optional noise filter. Each entry is matched against an event's CloudEvents
+#   # `type` and its OCSF `class_name` / `type_name`; a match drops the event
+#   # before it is posted. Omit or leave empty to capture everything (the goal).
+#   exclude_event_types:
+#     - Process Activity

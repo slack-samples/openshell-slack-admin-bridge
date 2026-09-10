@@ -1,0 +1,41 @@
+{
+  "_metadata": {
+    "note": "Create the Slack app from this manifest (api.slack.com/apps -> Create New App -> From a manifest). Socket Mode app: no request URLs. Requests a single bot scope (chat:write) to keep admin approval simple; the bot does not self-join, so invite it to the approval channel manually and set its ID in config/admins.yaml. See docs/03-deployment.md."
+  },
+  "display_information": {
+    "name": "OpenShell Admin",
+    "description": "Approve or reject OpenShell sandbox network-egress policy changes from Slack.",
+    "background_color": "#1f2933"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "openshell_admin",
+      "always_online": true
+    },
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": false,
+      "messages_tab_read_only_enabled": false
+    }
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "chat:write"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "app_home_opened"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}

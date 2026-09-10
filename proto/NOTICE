@@ -1,0 +1,21 @@
+Third-Party Notice
+==================
+
+The Protocol Buffer definitions in this directory (the *.proto files) originate
+from NVIDIA's OpenShell project:
+
+    https://github.com/NVIDIA/OpenShell
+
+They are included in this repository to define the gRPC wire contract that this
+sample communicates with. Each file retains its original SPDX header:
+
+    SPDX-License-Identifier: Apache-2.0
+    Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+These files are licensed under the Apache License, Version 2.0. You may obtain a
+copy of that license at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+They are NOT covered by the MIT License at the root of this repository
+(see ../LICENSE), which applies to the remainder of this sample.
