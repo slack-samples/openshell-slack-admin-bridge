@@ -59,7 +59,7 @@ const proposedChunks = [
     rule_name: "allow-telemetry",
     proposed_rule: {
       name: "allow-telemetry",
-      endpoints: [endpoint("telemetry.vendor.io", [443])],
+      endpoints: [endpoint("telemetry.example.io", [443])],
       binaries: [{ path: "/opt/agent/runner" }],
     },
     rationale: "Agent attempted to POST anonymous usage telemetry to an unlisted host.",

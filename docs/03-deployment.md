@@ -6,7 +6,7 @@ mock, see the README's "Local testing" section.
 
 ## Prerequisites
 
-- Node.js 20+ and npm.
+- Node.js 22+ and npm.
 - Network reach from wherever the bridge runs to the OpenShell gateway (gRPC).
 - A Slack workspace where you can install an app.
 - OpenShell gateway credentials: an mTLS bundle (single-host installs) or a bearer token
@@ -27,9 +27,9 @@ with minimal review. Two consequences to know:
   keep the scope surface small. You must create the approval channel and invite the bot yourself
   (next step). If the bot is later removed from the channel, posts fail with `not_in_channel` and the
   bridge retries on each poll until it is re-invited (no restart needed).
-- **Messages tab enabled** (`features.app_home.messages_tab_enabled`). Approvals route to a channel,
-  not DMs, so the whole admin group has visibility; the Messages tab is enabled only for a complete
-  App Home experience and adds no OAuth scope.
+- **Messages tab off, Home tab on** (`features.app_home`). Approvals route to a channel, not DMs, so
+  the app needs no Messages tab (`messages_tab_enabled: false`). The App Home dashboard uses the Home
+  tab (`home_tab_enabled: true`) instead. Neither tab adds an OAuth scope.
 
 ### Tokens
 

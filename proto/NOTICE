@@ -9,8 +9,8 @@ from NVIDIA's OpenShell project:
 They are included in this repository to define the gRPC wire contract that this
 sample communicates with. Each file retains its original SPDX header:
 
+    SPDX-FileCopyrightText: Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
     SPDX-License-Identifier: Apache-2.0
-    Copyright (c) 2025-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 These files are licensed under the Apache License, Version 2.0. You may obtain a
 copy of that license at:

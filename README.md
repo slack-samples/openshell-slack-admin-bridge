@@ -44,7 +44,7 @@ OpenShell gateway  <--gRPC-->  Bridge  <--Socket Mode-->  Slack
 Create the app from [`manifest.json`](./manifest.json): [api.slack.com/apps](https://api.slack.com/apps)
 -> **Create New App** -> **From a manifest**. It is a Socket Mode app (no request URLs) and requests a
 single bot scope, `chat:write`, to keep the install easy for admins to approve. It also sets the App
-Home + `app_home_opened` subscription, interactivity, and the Messages tab.
+Home + `app_home_opened` subscription and interactivity.
 
 After creating it, install to the workspace for the bot token (`xoxb-...`) and generate an
 app-level token with `connections:write` (`xapp-...`) for Socket Mode. The bot does not self-join
