@@ -16,7 +16,7 @@ npm test
 npm run build
 ```
 
-CI runs the same steps on Node 20 and 22 for every push and pull request (see
+CI runs the same steps on Node 22 and 24 for every push and pull request (see
 `.github/workflows/ci.yml`).
 
 ## Releasing
