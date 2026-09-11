@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/slack-samples/openshell-slack-admin-bridge/blob/main/SECURITY.md
+    about: Report security issues privately per the security policy, not as a public issue.
+  - name: Setup and deployment help
+    url: https://github.com/slack-samples/openshell-slack-admin-bridge/blob/main/docs/03-deployment.md
+    about: Deployment, configuration, and local-testing steps are covered in the docs.
