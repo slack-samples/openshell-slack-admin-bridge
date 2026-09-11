@@ -37,7 +37,7 @@
     "test": "node --import tsx --test \"test/**/*.test.ts\""
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
