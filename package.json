@@ -41,16 +41,16 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
-    "@grpc/proto-loader": "^0.7.13",
-    "@slack/bolt": "^4.1.0",
-    "@slack/web-api": "^7.19.0",
-    "dotenv": "^16.4.0",
-    "pino": "^9.5.0",
+    "@grpc/proto-loader": "^0.8.1",
+    "@slack/bolt": "^5.1.0",
+    "@slack/web-api": "^8.1.1",
+    "dotenv": "^17.4.2",
+    "pino": "^10.3.1",
     "yaml": "^2.6.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "@types/node": "^26.5.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   }
 }
