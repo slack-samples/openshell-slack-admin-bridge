@@ -68,7 +68,7 @@ const HOSTS = [
   "github.com",
   "api.openai.com",
   "weights.internal.example.net",
-  "telemetry.vendor.io",
+  "telemetry.example.io",
   "cdn.jsdelivr.net",
   "unknown-host.example.com",
 ];

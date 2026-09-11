@@ -15,7 +15,7 @@ For security issues, do not open a public issue. See [SECURITY.md](../SECURITY.m
 
 ## Development setup
 
-This is a TypeScript project targeting Node.js 20+.
+This is a TypeScript project targeting Node.js 22+.
 
 ```bash
 npm install

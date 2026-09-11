@@ -32,7 +32,7 @@ It covers both capabilities: the approval flow (Steps 1-8) and the audit-event c
 
 * macOS Apple Silicon (Homebrew present) or Linux x86_64/arm64 with glibc >= 2.28. Intel macOS and Alpine/musl are rejected by the installer.
 * A container runtime the gateway can drive (Docker Desktop / Docker Engine 28.0+, or Podman 5.x) is installed and running.
-* Node.js 20+ and npm, git, curl, jq available (Step 9 also uses `openssl`). On Linux the install step may require sudo (apt/dnf).
+* Node.js 22+ and npm, git, curl, jq available (Step 9 also uses `openssl`). On Linux the install step may require sudo (apt/dnf).
 * The bridge repo is `github.com/slack-samples/openshell-slack-admin-bridge`; the runtime it drives is `NVIDIA/OpenShell` (installed via curl below), a separate, unrelated project that happens to share the OpenShell name.
 
 # Step 1 - Preflight
@@ -45,7 +45,7 @@ It covers both capabilities: the approval flow (Steps 1-8) and the audit-event c
 export WORK="${WORK:-/tmp/openshell-bridge}"
 set -o pipefail
 mkdir -p "$WORK"
-node -p "+process.versions.node.split('.')[0] >= 20 ? 'NODE_OK' : 'NODE_BAD'"
+node -p "+process.versions.node.split('.')[0] >= 22 ? 'NODE_OK' : 'NODE_BAD'"
 npm -v
 git --version
 jq --version
