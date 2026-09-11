@@ -1,0 +1,82 @@
+name: Bug report
+description: Report a problem with the OpenShell Slack Admin Bridge
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug.
+
+        Please do **not** include Slack tokens, `config/admins.yaml` contents, channel or user IDs,
+        or gateway credentials. For a security vulnerability, use the
+        [security policy](https://github.com/slack-samples/openshell-slack-admin-bridge/blob/main/SECURITY.md)
+        instead of a public issue.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect to happen, and what actually happened?
+      placeholder: I expected an approval card to post, but the poller logged `not_in_channel`.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A failing command or a minimal case. Include the exact steps.
+      placeholder: |
+        1. npm run dev:mock
+        2. npm run dev
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the sample is affected?
+      options:
+        - Approval bridge (Slack + gRPC)
+        - Audit capture sink (start:capture)
+        - App Home dashboard
+        - Mock gateway / local testing
+        - Build, tooling, or CI
+        - Not sure / other
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Node.js version and OS (the app requires Node 22+).
+      placeholder: Node 22.5.0, macOS 14.5 (arm64)
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The bridge version (from package.json) or the commit SHA you are on.
+      placeholder: 0.1.0 / faf3a61
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: >
+        Paste relevant pino log lines, or attach a share-safe support bundle
+        (`npm run support-bundle`, which by design contains no tokens, IDs, or message text).
+      render: shell
+    validations:
+      required: false
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This is not a security vulnerability (those go through the security policy).
+          required: true
