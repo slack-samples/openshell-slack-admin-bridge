@@ -1,6 +1,6 @@
 # Quick start: local OpenShell gateway + exporter + Slack
 
-Deploy all three components and verify with a **real sandbox network denial**.
+Deploy all three components and verify with a ** sandbox network denial**.
 No synthetic JSONL or sample approval injection is used.
 
 ```text
@@ -57,7 +57,7 @@ cd openshell-slack-admin-bridge
 From its repository root, follow [Slack app setup](03-deployment.md#1-create-the-slack-app)
 and create `.env`/`config/admins.yaml` if absent. Preserve existing files.
 
-Put Slack bot/app tokens in `.env`, then configure the **real local gateway**:
+Put Slack bot/app tokens in `.env`, then configure the ** local gateway**:
 
 ```dotenv
 OPENSHELL_GATEWAY_URL=localhost:17670
@@ -103,7 +103,7 @@ Run `npm ci && npm run build`. Start `npm start` (bridge) in one terminal and
 `npm run start:capture` in another, both at the Slack repository root.
 The capture bearer token is separate from Slack tokens and the gateway mTLS key.
 
-## 4. Connect a real sandbox's OCSF output
+## 4. Connect a  sandbox's OCSF output
 
 These settings affect the selected gateway globally: use the dedicated local
 demo gateway, not a shared organizational gateway. They enable audit emission
@@ -120,7 +120,7 @@ openshell sandbox create --gateway openshell --name slack-live-demo \
   --no-auto-providers --no-tty --detach -- bash -lc 'while true; do sleep 3600; done'
 ```
 
-The supervisor writes real `openshell-ocsf.*.log` files into `slack-live-ocsf`.
+The supervisor writes  `openshell-ocsf.*.log` files into `slack-live-ocsf`.
 The exporter mounts that **same volume read-only** at `/var/log/openshell`.
 No manual file copying or guessed host directory is needed. If the sandbox
 already exists, preserve it and choose a new name; update
@@ -164,7 +164,7 @@ The supplied [exporter config](../examples/exporter-to-slack.yaml) already wires
 credential. The fresh volume is read from its beginning to include startup
 events; saved offsets resume after restart. Do not clear state to replay history.
 
-## 6. Verify with a real denied operation
+## 6. Verify with a  denied operation
 
 ```bash
 curl --fail http://127.0.0.1:13133/
