@@ -335,32 +335,3 @@ The deny-all policy should return proxy **HTTP 403**. Verify each layer separate
 
 Health/"Everything is ready" only proves startup. Connection-refused, TLS, bearer,
 or discovery errors mean a downstream connection still needs attention.
-
-## Reruns and troubleshooting
-
-- **Wrong directory:** repeat step 1's variable block. Use explicit paths, not
-  `$PWD` or `../OpenShell-Research` from an arbitrary shell.
-- **Unknown CLI flag:** check `type -a openshell` and use `OPENSHELL_BIN` explicitly.
-- **Secret path is a directory:** preserve/rename it and supply the matching file.
-  Recreate the stopped exporter after fixing directory-versus-file mount types;
-  `docker start` alone may fail.
-- **Container name conflict:** inspect before reusing. For config/mount changes,
-  stop and rename the old container as a backup, then rerun step 6 with the same
-  persistent paths. Never run backup and replacement simultaneously.
-- **Connection refused:** verify both host services and use `host.docker.internal`
-  from the container, not `localhost`. Check firewall/VPN restrictions. No Docker
-  networking setting change is required.
-- **TLS/authentication:** check expiry, hostname coverage, trusted CA, matching
-  capture token, and gateway client bundle; do not bypass verification.
-- **Docker restart/host sleep:** may stop sandboxes. On 0.0.113 an `Error` sandbox
-  cannot use `sandbox start`; preserve it, create a fresh short name, and update
-  `SANDBOX_NAME` when recreating the exporter. Use `sandbox stop` before planned
-  maintenance and `sandbox start` for a Stopped sandbox. Credential expiry may
-  independently require recovery.
-
-Keep secrets/state private; the repository's `state/` is gitignored. The example
-starts at the beginning of newly discovered files to include startup, so a reused
-populated volume may ingest old history. Saved checkpoints take precedence after
-restart; do not clear them to replay events. WatchSandbox is non-resumable, Slack's
-queue is in-memory, and retries can duplicate cards. Retain durable recovery
-output; this is not a production HA/audit guarantee.
