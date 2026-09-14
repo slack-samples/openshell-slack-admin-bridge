@@ -39,7 +39,8 @@ OpenShell gateway  <--gRPC-->  Bridge  <--Socket Mode-->  Slack
 
 ## Setup
 
-For a short Docker Desktop setup, see the [exporter quick start](docs/exporter-quickstart.md).
+For a manual, step-by-step local gateway → exporter → Slack setup using ordinary
+Docker Desktop bridge networking, see the [exporter quick start](docs/exporter-quickstart.md).
 For audit ingestion from NVIDIA's Research exporter, see the
 [Research exporter integration guide](docs/research-exporter.md). It covers the
 pinned source build, envelope-v1 adapter, TLS/bearer setup, and a synthetic

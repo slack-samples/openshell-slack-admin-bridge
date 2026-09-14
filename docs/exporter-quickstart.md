@@ -1,63 +1,125 @@
 # Quick start: local OpenShell gateway + exporter + Slack
 
-Deploy all three components and verify with a ** sandbox network denial**.
-No synthetic JSONL or sample approval injection is used.
+Run each component explicitly, then verify with a real sandbox network denial.
+There is no launcher, Compose stack, synthetic JSONL, or sample approval injection.
 
 ```text
-Slack bridge (Mac) ──mTLS──> local OpenShell gateway (Mac service)
-                                   │ manages Docker sandbox
-Exporter (Docker) ──mTLS WatchSandbox┘
-       ↑ reads shared OCSF volume written by sandbox supervisor
-       └──HTTPS CloudEvents──> Slack capture (Mac) ──> Slack
+Slack bridge (Mac) ──mTLS──> OpenShell gateway (Mac) ──> Docker sandbox
+                                  ↑                       │ OCSF JSONL
+                            mTLS WatchSandbox             ↓
+Slack capture (Mac) <──HTTPS── Exporter (Docker) <── shared log volume
+       │
+       └── Slack audit cards / App Home
 ```
 
-This recipe uses the standard local mTLS gateway, not the custom plaintext
-gateway on port 8180 in the earlier demo. Use a **fresh local setup**; do not
-reinstall an existing gateway or start duplicate processes on its ports/state.
-The existing demo does not need redeployment to use this guide.
+The bridge handles approvals directly with the gateway. The exporter collects
+audit data and sends it to capture. Capture formats it for Slack.
 
-## 1. Deploy the local gateway
+This walkthrough targets **macOS Apple Silicon with Docker Desktop** and the
+standard local mTLS gateway. It uses ordinary Docker **bridge networking**:
+containers reach Mac services through `host.docker.internal`. **Do not enable
+Docker Desktop host networking or restart Docker for this guide.**
+[Docker's container-to-host networking documentation](https://docs.docker.com/desktop/features/networking/networking-how-tos/).
 
-Requirements: macOS Apple Silicon, Homebrew, Docker Desktop, Node.js 22+,
-Git and OpenSSL with `req -addext` support. Enable Docker Desktop **Settings →
-Resources → Network → Enable host networking** (4.34+). This lets the exporter
-use the gateway's `localhost` TLS identity without skipping verification.
-Host networking is incompatible with Enhanced Container Isolation; do not
-disable an organizational security control to follow this recipe.
-[Docker networking requirements](https://docs.docker.com/engine/network/drivers/host/).
+Use a dedicated demo gateway. For an existing deployment, reuse its configuration
+deliberately; do not overwrite secrets or start duplicate services. Stop at any
+failed check rather than continuing to later commands.
 
-On a fresh setup, install the CLI **and local gateway service**:
+## 1. Choose directories and get the Slack code
+
+Requirements: Homebrew, Docker Desktop running, Git, Node.js 22+, and OpenSSL
+with `req -addext` support. Shell examples use Bash/zsh. Change these **absolute
+paths** as needed. Repeat this variable block in each new terminal. Existing
+checkouts can be anywhere, including paths with spaces: set `SLACK_DIR` and
+`EXPORTER_SRC` to those locations instead of cloning again.
+
+```bash
+export QUICKSTART_ROOT="$HOME/openshell-slack-demo"
+export SLACK_DIR="$QUICKSTART_ROOT/openshell-slack-admin-bridge"
+export EXPORTER_SRC="$QUICKSTART_ROOT/OpenShell-Research"
+export DEMO_STATE="$SLACK_DIR/state/exporter"
+export GATEWAY="openshell"
+export DEMO_WORKSPACE="default"
+export SANDBOX_NAME="slack-live-demo"
+export OCSF_VOLUME="slack-live-ocsf"
+export GATEWAY_MTLS="$HOME/.config/openshell/gateways/$GATEWAY/mtls"
+export EXPORTER_REF="26dbfd52730429695670c27a0ec0449a851e755c"
+export EXPORTER_IMAGE="openshell-exporter:slack-26dbfd5"
+mkdir -p "$QUICKSTART_ROOT"
+```
+
+For a new checkout, the intended upstream location is:
+
+```bash
+git clone https://github.com/slack-samples/openshell-slack-admin-bridge.git "$SLACK_DIR"
+```
+
+If it already exists, skip cloning and review its branch/changes before updating.
+This guide requires the envelope-v1 adapter in this change set. **Until that
+change is merged upstream, use the reviewed contribution branch**; do not assume
+upstream `main` already contains it. Check the checkout:
+
+```bash
+git -C "$SLACK_DIR" status --short --branch
+test -f "$SLACK_DIR/examples/exporter-to-slack.yaml"
+grep -q 'urn:openshell:event-envelope:1' "$SLACK_DIR/src/capture/cloudevents.ts"
+docker info >/dev/null
+node --version
+```
+
+The walkthrough is intended for upstream `main` once reviewed and merged; no
+personal fork or older demo directory is required by the deployment itself.
+
+## 2. Install or connect to the local gateway
+
+For an **existing** gateway, skip installation. On a **fresh** Mac, inspect the
+pinned installer first; it installs the CLI and local gateway service. This
+recipe is pinned to OpenShell **0.0.113**.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/NVIDIA/OpenShell/v0.0.113/install.sh \
-  -o /tmp/openshell-install-v0.0.113.sh
-# Inspect the installer before running it.
-OPENSHELL_VERSION=v0.0.113 sh /tmp/openshell-install-v0.0.113.sh
-openshell gateway info --name openshell
-openshell status --gateway openshell
+  -o "$QUICKSTART_ROOT/openshell-install-v0.0.113.sh"
+# Read the installer first; run only on a fresh setup.
+OPENSHELL_VERSION=v0.0.113 sh "$QUICKSTART_ROOT/openshell-install-v0.0.113.sh"
 ```
 
-The macOS installer starts the Homebrew service and registers gateway
-`openshell` at `https://localhost:17670`. Confirm it is connected and uses the
-Docker compute driver. Its client mTLS bundle is at
-`$HOME/.config/openshell/gateways/openshell/mtls/{ca.crt,tls.crt,tls.key}`.
-Keep the private key secret; do not disable gateway TLS/authentication.
-
-## 2. Deploy Slack code and connect it to the gateway
-
-Clone the fork's integration branch containing the exporter **envelope-v1 adapter**
-(`src/capture/cloudevents.ts`). These changes are not yet merged upstream;
-a stock upstream clone is not the tested working tree.
+Select Homebrew's binary explicitly to avoid an older pip/uv CLI on PATH. For
+another installation, use its absolute binary path. Repeat this assignment in
+each terminal using the CLI.
 
 ```bash
-git clone --branch codex/local-exporter-integration https://github.com/delgadof/openshell-slack-admin-bridge.git
-cd openshell-slack-admin-bridge
+export OPENSHELL_BIN="$(brew --prefix openshell)/bin/openshell"
+"$OPENSHELL_BIN" --version
+"$OPENSHELL_BIN" sandbox create --help | grep -- --driver-config-json
+"$OPENSHELL_BIN" gateway info --gateway "$GATEWAY"
+"$OPENSHELL_BIN" provider list-profiles --gateway "$GATEWAY"
 ```
 
-From its repository root, follow [Slack app setup](03-deployment.md#1-create-the-slack-app)
-and create `.env`/`config/admins.yaml` if absent. Preserve existing files.
+Confirm a healthy gateway with the Docker compute driver at
+`https://localhost:17670`. Resolve any invalid provider profiles before proceeding;
+do not bypass credential inspection to fix catalog validation.
 
-Put Slack bot/app tokens in `.env`, then configure the ** local gateway**:
+The client bundle contains `ca.crt`, `tls.crt`, and `tls.key` under `GATEWAY_MTLS`.
+Keep the key private. The gateway **server** certificate must cover
+`host.docker.internal`; the standard installer bundle does. A custom gateway
+needs a reachable hostname covered by its certificate. Do not skip TLS validation.
+
+## 3. Configure and start the Slack bridge and capture receiver
+
+Follow [Slack app setup](03-deployment.md#1-create-the-slack-app): create/install
+the Socket Mode app and obtain bot and app-level tokens. From the checkout:
+
+```bash
+cd "$SLACK_DIR"
+test -e .env || cp .env.example .env
+test -e config/admins.yaml || cp config/admins.example.yaml config/admins.yaml
+chmod 600 .env config/admins.yaml
+```
+
+Edit `.env` locally to set Slack tokens and the following gateway settings.
+If you changed the gateway/workspace or bundle location, use matching values and
+absolute paths here. The app expands `${HOME}` but not arbitrary shell variables
+inside `.env`.
 
 ```dotenv
 OPENSHELL_GATEWAY_URL=localhost:17670
@@ -70,25 +132,32 @@ OPENSHELL_CLIENT_KEY=${HOME}/.config/openshell/gateways/openshell/mtls/tls.key
 OPENSHELL_WORKSPACE=default
 ```
 
-Add your Slack user ID to `admins`. Set `routing.default_channel` to the approval
-channel and `routing.audit_channel` to a **different** audit channel. Invite the
-bot to both. The app's Home tab displays the audit summary.
+In `config/admins.yaml`, add your Slack user ID to `admins`, set
+`routing.default_channel` to the approval channel and `routing.audit_channel`
+to a different audit channel. Invite the bot to both.
 
-## 3. Configure and start Slack capture
-
-Run once from the Slack repository root; never regenerate over an existing
-installation. `state/` is gitignored and must not be published.
+For a **new capture receiver**, create a private bearer token and self-signed TLS
+certificate once. The guard refuses to overwrite existing files or directories.
 
 ```bash
 umask 077
-mkdir -p state/exporter/{state,output,secrets}
-openssl rand -hex 32 -out state/exporter/secrets/capture-token
-openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
-  -keyout state/exporter/secrets/capture.key -out state/exporter/secrets/capture.crt \
-  -subj '/CN=localhost' -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1'
+mkdir -p "$DEMO_STATE"/state "$DEMO_STATE"/output "$DEMO_STATE"/secrets
+if [ ! -e "$DEMO_STATE/secrets/capture-token" ] && \
+   [ ! -e "$DEMO_STATE/secrets/capture.key" ] && \
+   [ ! -e "$DEMO_STATE/secrets/capture.crt" ]; then
+  openssl rand -hex 32 -out "$DEMO_STATE/secrets/capture-token" &&
+  openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
+    -keyout "$DEMO_STATE/secrets/capture.key" \
+    -out "$DEMO_STATE/secrets/capture.crt" \
+    -subj '/CN=host.docker.internal' \
+    -addext 'subjectAltName=DNS:host.docker.internal,DNS:localhost,IP:127.0.0.1'
+else
+  echo "Capture material already exists: inspect and reuse it; do not overwrite it."
+fi
 ```
 
-Add to `.env`:
+Add to `.env`. Relative paths resolve from `SLACK_DIR`, where both Node processes
+run. If you chose another `DEMO_STATE`, put its absolute paths here instead.
 
 ```dotenv
 CAPTURE_SOURCES=http
@@ -99,77 +168,151 @@ CAPTURE_RECEIVER_TLS_KEY=./state/exporter/secrets/capture.key
 CAPTURE_SUMMARY_STATE=./state/audit-summary.json
 ```
 
-Run `npm ci && npm run build`. Start `npm start` (bridge) in one terminal and
-`npm run start:capture` in another, both at the Slack repository root.
-The capture bearer token is separate from Slack tokens and the gateway mTLS key.
+For an **existing receiver**, reuse its exact bearer token and trusted CA rather
+than generating unrelated credentials. Put copies at the exporter's token/CA
+paths above, or change the source mounts in step 6. With a CA-signed receiver
+certificate, the exporter needs the **CA certificate**, not the server private
+key. Never mount the capture private key into the exporter. Do not start another
+receiver on port 8090 or another bridge using the same state.
 
-## 4. Connect a  sandbox's OCSF output
-
-These settings affect the selected gateway globally: use the dedicated local
-demo gateway, not a shared organizational gateway. They enable audit emission
-and proposals, not automatic approval.
+Build once, then run the processes in separate terminals:
 
 ```bash
-openshell settings set --gateway openshell --global --yes --key ocsf_json_enabled --value true
-openshell settings set --gateway openshell --global --yes --key agent_policy_proposals_enabled --value true
-docker volume create slack-live-ocsf
-openshell sandbox create --gateway openshell --name slack-live-demo \
-  --from ghcr.io/nvidia/openshell-community/sandboxes/base:latest@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e \
-  --policy examples/slack-deny-egress.yaml \
-  --driver-config-json '{"docker":{"mounts":[{"type":"volume","source":"slack-live-ocsf","target":"/var/log","read_only":false}]}}' \
-  --no-auto-providers --no-tty --detach -- bash -lc 'while true; do sleep 3600; done'
+cd "$SLACK_DIR"
+npm ci && npm run build
+npm start
 ```
 
-The supervisor writes  `openshell-ocsf.*.log` files into `slack-live-ocsf`.
-The exporter mounts that **same volume read-only** at `/var/log/openshell`.
-No manual file copying or guessed host directory is needed. If the sandbox
-already exists, preserve it and choose a new name; update
-`watchsandbox.sandbox_names` in the config to match.
+```bash
+# Repeat step 1's variable block in this terminal first.
+cd "$SLACK_DIR"
+npm run start:capture
+```
 
-## 5. Build and deploy the exporter
+Keep these running and use another terminal for the next steps. Capture remains
+bound to Mac loopback; Docker Desktop provides the container-to-host connection.
+Do not expose it to the LAN as a shortcut.
 
-From the Slack repository root, use a fresh sibling Research checkout; preserve
-an existing checkout. This pins the merged [PR70](https://github.com/NVIDIA/OpenShell-Research/pull/70)
-source, not an assumed published container image.
+## 4. Create a real sandbox and expose its OCSF volume
+
+These settings affect the selected gateway globally: use a dedicated demo
+gateway. They enable emission and proposals, not automatic approval. Check for
+an existing sandbox name before creating:
 
 ```bash
-git clone https://github.com/NVIDIA/OpenShell-Research.git ../OpenShell-Research
-git -C ../OpenShell-Research checkout --detach 26dbfd52730429695670c27a0ec0449a851e755c
+"$OPENSHELL_BIN" sandbox list --gateway "$GATEWAY" --workspace "$DEMO_WORKSPACE"
+"$OPENSHELL_BIN" settings set --gateway "$GATEWAY" --global --yes --key ocsf_json_enabled --value true
+"$OPENSHELL_BIN" settings set --gateway "$GATEWAY" --global --yes --key agent_policy_proposals_enabled --value true
+docker volume create "$OCSF_VOLUME"
+"$OPENSHELL_BIN" sandbox create --gateway "$GATEWAY" --workspace "$DEMO_WORKSPACE" \
+  --name "$SANDBOX_NAME" \
+  --from ghcr.io/nvidia/openshell-community/sandboxes/base:latest@sha256:aeef1c63f00e2913ea002ccb3aaf925f338b5c5d70e63576f0d95c16a138044e \
+  --policy "$SLACK_DIR/examples/slack-deny-egress.yaml" \
+  --driver-config-json "{\"docker\":{\"mounts\":[{\"type\":\"volume\",\"source\":\"$OCSF_VOLUME\",\"target\":\"/var/log\",\"read_only\":false}]}}" \
+  --no-auto-providers --no-tty --detach -- bash -lc 'while true; do sleep 3600; done'
+"$OPENSHELL_BIN" sandbox get "$SANDBOX_NAME" --gateway "$GATEWAY" --workspace "$DEMO_WORKSPACE"
+```
+
+Wait for **Ready**. If a sandbox already exists, inspect/reuse it or select a new
+name (maximum 19 characters in this CLI); do not delete it blindly. Reused
+sandboxes must actually have the log mount. The supervisor writes
+`openshell-ocsf.*.log` into this volume. The exporter mounts the same volume
+read-only at `/var/log/openshell`; no guessed host log paths or manual copying.
+
+## 5. Build the exporter from merged source
+
+The exporter lives in [NVIDIA/OpenShell-Research](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/openshell-exporter).
+`EXPORTER_REF` pins a tested commit already merged into that repository's `main`.
+No pull-request branch or NVIDIA-published exporter image is required.
+
+For a **new** checkout/build:
+
+```bash
+git clone https://github.com/NVIDIA/OpenShell-Research.git "$EXPORTER_SRC" &&
+git -C "$EXPORTER_SRC" checkout --detach "$EXPORTER_REF" &&
 docker build --platform linux/amd64 \
   --build-arg VERSION=0.0.5-rc.1 \
-  --build-arg VCS_REF=26dbfd52730429695670c27a0ec0449a851e755c \
-  -t openshell-exporter:slack-26dbfd5 ../OpenShell-Research/projects/openshell-exporter
-
-docker run --detach --name openshell-exporter-slack --platform linux/amd64 \
-  --network host --user "$(id -u):$(id -g)" --read-only --cap-drop ALL \
-  --security-opt no-new-privileges:true --workdir /work \
-  -v "$PWD/examples/exporter-to-slack.yaml:/work/config.yaml:ro" \
-  -v slack-live-ocsf:/var/log/openshell:ro \
-  -v "$HOME/.config/openshell/gateways/openshell/mtls:/run/secrets/gateway:ro" \
-  -v "$PWD/state/exporter/secrets/capture-token:/work/secrets/capture-token:ro" \
-  -v "$PWD/state/exporter/secrets/capture.crt:/work/secrets/capture.crt:ro" \
-  -v "$PWD/state/exporter/state:/work/state" \
-  -v "$PWD/state/exporter/output:/work/output" \
-  openshell-exporter:slack-26dbfd5 --config /work/config.yaml
+  --build-arg VCS_REF="$EXPORTER_REF" \
+  -t "$EXPORTER_IMAGE" "$EXPORTER_SRC/projects/openshell-exporter"
 ```
 
-The supplied [exporter config](../examples/exporter-to-slack.yaml) already wires:
+For an existing checkout, inspect `git -C "$EXPORTER_SRC" status --short --branch`
+and `git -C "$EXPORTER_SRC" rev-parse HEAD` first. Preserve local work; choose
+another checkout directory if needed. If the desired image exists, skip
+rebuilding. The build context is the exporter subdirectory, not the Research
+root. Docker Desktop uses emulation for this `linux/amd64` build on Apple Silicon.
 
-- Gateway API: `https://localhost:17670`, mTLS, workspace `default`, sandbox `slack-live-demo`.
-- Native OCSF: `/var/log/openshell/openshell-ocsf.*.log` from the shared volume.
-- Normalization/redaction, persistent checkpoints, retry queue and recovery output.
-- Slack capture: `https://localhost:8090/v1/events`, trusted certificate and shared bearer.
+## 6. Run the exporter on ordinary Docker networking
 
-`gateway_id: openshell` is this deployment's correlation label, not an auth
-credential. The fresh volume is read from its beginning to include startup
-events; saved offsets resume after restart. Do not clear state to replay history.
-
-## 6. Verify with a  denied operation
+Copy the example to local state once so deployment edits never alter the shared
+example. Environment variables below select the sandbox and gateway context.
 
 ```bash
-curl --fail http://127.0.0.1:13133/
-docker logs --tail 30 openshell-exporter-slack
-openshell sandbox connect --gateway openshell slack-live-demo
+test -e "$DEMO_STATE/config.yaml" || cp "$SLACK_DIR/examples/exporter-to-slack.yaml" "$DEMO_STATE/config.yaml"
+export EXPORTER_GATEWAY_ENDPOINT="https://host.docker.internal:17670"
+export EXPORTER_CAPTURE_ENDPOINT="https://host.docker.internal:8090/v1/events"
+```
+
+For another gateway/receiver, use reachable HTTPS endpoints covered by their
+certificates and matching CA/client mounts. On native Linux,
+`host.docker.internal` requires explicit host-gateway mapping and host services
+reachable on that interface; Docker Desktop's loopback-forwarding recipe is not
+a universal Linux configuration. Do not bypass TLS or host firewalls.
+
+Inspect existing containers/ports and check every source file first. If a name
+or health port is occupied, inspect that deployment; independent installations
+need distinct names, ports, and state. Never run two exporters against the same
+checkpoint/queue directory.
+
+```bash
+docker ps -a --filter name=openshell-exporter-slack
+if lsof -nP -iTCP:13133 -sTCP:LISTEN; then
+  echo "STOP: health port 13133 is already in use; inspect before proceeding."
+fi
+for required_file in "$DEMO_STATE/config.yaml" \
+  "$DEMO_STATE/secrets/capture-token" "$DEMO_STATE/secrets/capture.crt" \
+  "$GATEWAY_MTLS/ca.crt" "$GATEWAY_MTLS/tls.crt" "$GATEWAY_MTLS/tls.key"; do
+  if [ ! -f "$required_file" ] || [ ! -s "$required_file" ]; then
+    echo "STOP: missing, empty, or not a regular file: $required_file"
+  fi
+done
+openssl x509 -in "$DEMO_STATE/secrets/capture.crt" -noout -dates
+docker image inspect "$EXPORTER_IMAGE" --format '{{.Id}}'
+```
+
+Resolve every `STOP` before continuing. `--mount` fails when a source is missing;
+unlike `-v`, it does not create empty directories in place of secret files.
+
+```bash
+docker run --detach --name openshell-exporter-slack --platform linux/amd64 \
+  --network bridge --publish 127.0.0.1:13133:13133 \
+  --user "$(id -u):$(id -g)" --read-only --cap-drop ALL \
+  --security-opt no-new-privileges:true --workdir /work \
+  --env EXPORTER_GATEWAY_ENDPOINT --env EXPORTER_CAPTURE_ENDPOINT \
+  --env "OPENSHELL_GATEWAY_ID=$GATEWAY" --env "OPENSHELL_WORKSPACE=$DEMO_WORKSPACE" \
+  --env "OPENSHELL_SANDBOX_NAME=$SANDBOX_NAME" \
+  --env "EXPORTER_CLOUDEVENTS_SOURCE=openshell://$GATEWAY/$DEMO_WORKSPACE" \
+  --mount "type=bind,source=$DEMO_STATE/config.yaml,target=/work/config.yaml,readonly" \
+  --mount "type=volume,source=$OCSF_VOLUME,target=/var/log/openshell,readonly" \
+  --mount "type=bind,source=$GATEWAY_MTLS,target=/run/secrets/gateway,readonly" \
+  --mount "type=bind,source=$DEMO_STATE/secrets/capture-token,target=/work/secrets/capture-token,readonly" \
+  --mount "type=bind,source=$DEMO_STATE/secrets/capture.crt,target=/work/secrets/capture.crt,readonly" \
+  --mount "type=bind,source=$DEMO_STATE/state,target=/work/state" \
+  --mount "type=bind,source=$DEMO_STATE/output,target=/work/output" \
+  "$EXPORTER_IMAGE" --config /work/config.yaml
+```
+
+The container health listener binds `0.0.0.0:13133`, but its published Mac port
+binds only `127.0.0.1`. There is no `--network host`. Native OCSF and authorized
+WatchSandbox data pass through normalization/redaction and authenticated HTTPS
+to capture. `gateway_id` is a correlation label, not an authorization credential.
+
+## 7. Verify a real denied operation
+
+```bash
+curl --fail --max-time 5 http://127.0.0.1:13133/
+docker logs --since 2m --tail 40 openshell-exporter-slack
+"$OPENSHELL_BIN" sandbox connect --gateway "$GATEWAY" --workspace "$DEMO_WORKSPACE" "$SANDBOX_NAME"
 ```
 
 Inside the sandbox:
@@ -179,20 +322,45 @@ curl --max-time 10 https://example.org
 exit
 ```
 
-The deny-all network policy should produce proxy **HTTP 403**. Verify separately:
+The deny-all policy should return proxy **HTTP 403**. Verify each layer separately:
 
-1. A new denial appears in `state/exporter/output/events.json`.
-2. The audit card reaches Slack and App Home activity updates.
-3. The gateway's generated proposal appears in the approval channel. A denial
-   and proposal are distinct records; confirm both rather than assuming.
-4. As an authorized admin, optionally approve/reject that specific proposal.
-   Reconnect and retry the **same** request to verify the effective policy.
+1. Sandbox remains Ready and the request is denied.
+2. A matching record appears in `$DEMO_STATE/output/events.json`.
+3. The audit card reaches Slack and App Home activity updates.
+4. If the gateway produces a policy proposal, it appears in the approval channel.
+   Denials and proposals are distinct; not every denied `curl` necessarily creates
+   an approval request. The bridge must target this same gateway/workspace.
+5. As an authorized admin, optionally approve/reject a specific proposal. Retry
+   the same request to verify policy enforcement, not just a Slack button.
 
-Do not use `seed-approvals.sh` for this verification. No fake JSONL is needed.
-Health alone is not end-to-end proof. `WatchSandbox` adds gateway logs/status
-and policy context; the shared volume supplies native OCSF records.
+Health/"Everything is ready" only proves startup. Connection-refused, TLS, bearer,
+or discovery errors mean a downstream connection still needs attention.
 
-Keep state/output and one writer per checkpoint directory. Slack is rate-limited;
-its queue is in-memory and retries can duplicate cards. Keep durable recovery
-output as the audit record. OpenShell 0.0.113 may need recovery after sandbox-token
-expiry/long host sleep; this is not a production HA recipe.
+## Reruns and troubleshooting
+
+- **Wrong directory:** repeat step 1's variable block. Use explicit paths, not
+  `$PWD` or `../OpenShell-Research` from an arbitrary shell.
+- **Unknown CLI flag:** check `type -a openshell` and use `OPENSHELL_BIN` explicitly.
+- **Secret path is a directory:** preserve/rename it and supply the matching file.
+  Recreate the stopped exporter after fixing directory-versus-file mount types;
+  `docker start` alone may fail.
+- **Container name conflict:** inspect before reusing. For config/mount changes,
+  stop and rename the old container as a backup, then rerun step 6 with the same
+  persistent paths. Never run backup and replacement simultaneously.
+- **Connection refused:** verify both host services and use `host.docker.internal`
+  from the container, not `localhost`. Check firewall/VPN restrictions. No Docker
+  networking setting change is required.
+- **TLS/authentication:** check expiry, hostname coverage, trusted CA, matching
+  capture token, and gateway client bundle; do not bypass verification.
+- **Docker restart/host sleep:** may stop sandboxes. On 0.0.113 an `Error` sandbox
+  cannot use `sandbox start`; preserve it, create a fresh short name, and update
+  `SANDBOX_NAME` when recreating the exporter. Use `sandbox stop` before planned
+  maintenance and `sandbox start` for a Stopped sandbox. Credential expiry may
+  independently require recovery.
+
+Keep secrets/state private; the repository's `state/` is gitignored. The example
+starts at the beginning of newly discovered files to include startup, so a reused
+populated volume may ingest old history. Saved checkpoints take precedence after
+restart; do not clear them to replay events. WatchSandbox is non-resumable, Slack's
+queue is in-memory, and retries can duplicate cards. Retain durable recovery
+output; this is not a production HA/audit guarantee.

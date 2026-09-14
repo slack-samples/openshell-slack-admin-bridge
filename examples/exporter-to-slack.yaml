@@ -1,4 +1,5 @@
 # Real local gateway + shared sandbox OCSF -> authenticated HTTPS -> Slack capture.
+# Docker Desktop bridge networking; no host-networking setting required.
 # Paths are relative to /work in Docker. Preserve state and output on restart.
 extensions:
   file_storage/checkpoints:
@@ -10,7 +11,8 @@ extensions:
   bearertokenauth/slack:
     filename: ./secrets/capture-token
   health_check:
-    endpoint: 127.0.0.1:13133
+    # Publish this container port ONLY on host loopback: 127.0.0.1:13133:13133.
+    endpoint: 0.0.0.0:13133
 
 receivers:
   file_log/ocsf:
@@ -28,10 +30,10 @@ receivers:
         parse_from: body
         parse_to: body
   watchsandbox:
-    endpoint: https://localhost:17670
-    gateway_id: openshell
-    workspace: default
-    sandbox_names: [slack-live-demo]
+    endpoint: ${env:EXPORTER_GATEWAY_ENDPOINT:-https://host.docker.internal:17670}
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID:-openshell}
+    workspace: ${env:OPENSHELL_WORKSPACE:-default}
+    sandbox_names: ["${env:OPENSHELL_SANDBOX_NAME:-slack-live-demo}"]
     token_env: ''
     discovery_interval: 3s
     tls:
@@ -50,20 +52,20 @@ processors:
     spike_limit_mib: 64
   openshell:
     source_profiles: [ocsf.file, watchsandbox, policy.reconciliation]
-    gateway_id: openshell
-    workspace: default
+    gateway_id: ${env:OPENSHELL_GATEWAY_ID:-openshell}
+    workspace: ${env:OPENSHELL_WORKSPACE:-default}
     source_instance: slack-ocsf
     validation:
       mode: mark
 
 exporters:
   cloudevents/slack:
-    endpoint: https://localhost:8090/v1/events
+    endpoint: ${env:EXPORTER_CAPTURE_ENDPOINT:-https://host.docker.internal:8090/v1/events}
     auth:
       authenticator: bearertokenauth/slack
     tls:
       ca_file: ./secrets/capture.crt
-    default_source: openshell://openshell/default
+    default_source: ${env:EXPORTER_CLOUDEVENTS_SOURCE:-openshell://openshell/default}
     retry_on_failure:
       enabled: true
       max_elapsed_time: 0s
