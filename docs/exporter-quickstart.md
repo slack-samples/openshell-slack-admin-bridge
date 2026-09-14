@@ -145,7 +145,7 @@ mkdir -p "$DEMO_STATE"/state "$DEMO_STATE"/output "$DEMO_STATE"/secrets
 if [ ! -e "$DEMO_STATE/secrets/capture-token" ] && \
    [ ! -e "$DEMO_STATE/secrets/capture.key" ] && \
    [ ! -e "$DEMO_STATE/secrets/capture.crt" ]; then
-  openssl rand -hex 32 -out "$DEMO_STATE/secrets/capture-token" &&
+  openssl rand -hex -out "$DEMO_STATE/secrets/capture-token" 32 &&
   openssl req -x509 -newkey rsa:2048 -nodes -days 30 \
     -keyout "$DEMO_STATE/secrets/capture.key" \
     -out "$DEMO_STATE/secrets/capture.crt" \
