@@ -24,6 +24,7 @@ export interface ParsedEnvelopeOk {
   source: string | null;
   subject: string | null;
   time: string | null;
+  dataschema: string | null;
   // The decoded event payload — expected to be a flat OCSF object.
   data: unknown;
 }
@@ -42,6 +43,68 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function asStringAttr(v: unknown): string | null {
   return typeof v === "string" ? v : null;
+}
+
+function asEpochMs(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
+function severityFromLogLevel(v: unknown): { severity: string; severity_id: number } | null {
+  if (typeof v !== "string") return null;
+  switch (v.trim().toUpperCase()) {
+    case "TRACE":
+    case "DEBUG":
+    case "INFO":
+      return { severity: "Informational", severity_id: 1 };
+    case "WARN":
+    case "WARNING":
+      return { severity: "Medium", severity_id: 3 };
+    case "ERROR":
+      return { severity: "High", severity_id: 4 };
+    case "CRITICAL":
+      return { severity: "Critical", severity_id: 5 };
+    case "FATAL":
+      return { severity: "Fatal", severity_id: 6 };
+    default:
+      return null;
+  }
+}
+
+// The OpenShell Event Exporter sends envelope-v1 rather than a bare OCSF object.
+// Preserve the original event for Slack's OCSF renderer, while filling only
+// missing display/summary fields from the exporter's canonical context. This is
+// especially important for WatchSandbox operational log records, whose native
+// names are sandbox_id/timestamp_ms/level rather than OCSF metadata.uid/time/
+// severity. Existing OCSF values always win.
+function unwrapOpenShellEnvelope(data: Record<string, unknown>, cloudEventTime: string | null): unknown {
+  if (!("original" in data)) return null;
+  if (!isObject(data.original)) return data.original;
+
+  const original = data.original;
+  const adapted: Record<string, unknown> = { ...original };
+  const openshell = isObject(data.openshell) ? data.openshell : {};
+
+  const existingMetadata = isObject(original.metadata) ? original.metadata : {};
+  if (asStringAttr(existingMetadata.uid) === null) {
+    const sandboxId = asStringAttr(openshell.sandbox_id) ?? asStringAttr(original.sandbox_id);
+    if (sandboxId) adapted.metadata = { ...existingMetadata, uid: sandboxId };
+  }
+
+  if (asEpochMs(original.time) === null) {
+    const sourceTime = asEpochMs(original.timestamp_ms);
+    const envelopeTime = cloudEventTime ? Date.parse(cloudEventTime) : Number.NaN;
+    if (sourceTime !== null) adapted.time = sourceTime;
+    else if (Number.isFinite(envelopeTime)) adapted.time = envelopeTime;
+  }
+
+  if (asStringAttr(original.severity) === null) {
+    const mapped = severityFromLogLevel(original.level);
+    if (mapped) Object.assign(adapted, mapped);
+  }
+
+  return adapted;
 }
 
 // Parse one already-JSON-decoded CloudEvents envelope value. Reusable for binary
@@ -77,13 +140,27 @@ export function parseEnvelope(value: unknown): ParsedEnvelope {
     data = value.data ?? null;
   }
 
+  const time = asStringAttr(value.time);
+  const dataschema = asStringAttr(value.dataschema);
+  if (dataschema === "urn:openshell:event-envelope:1") {
+    if (!isObject(data) || !("original" in data)) {
+      return {
+        ok: false,
+        error: "OpenShell event envelope is missing data.original",
+        raw: value,
+      };
+    }
+    data = unwrapOpenShellEnvelope(data, time);
+  }
+
   return {
     ok: true,
     type,
     id: asStringAttr(value.id),
     source: asStringAttr(value.source),
     subject: asStringAttr(value.subject),
-    time: asStringAttr(value.time),
+    time,
+    dataschema,
     data,
   };
 }

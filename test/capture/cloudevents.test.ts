@@ -25,7 +25,65 @@ test("parses a single structured envelope and extracts context attributes", () =
   assert.equal(item.id, "evt-1");
   assert.equal(item.source, "openshell/sandbox-abc123");
   assert.equal(item.time, "2026-08-30T00:00:00Z");
+  assert.equal(item.dataschema, null);
   assert.deepEqual(item.data, OCSF);
+});
+
+test("unwraps exporter envelope-v1 and retains canonical OCSF fields", () => {
+  const [item] = parseCloudEventsBody(JSON.stringify(envelope({
+    dataschema: "urn:openshell:event-envelope:1",
+    data: {
+      openshell: { sandbox_id: "sandbox-from-envelope" },
+      original: {
+        ...OCSF,
+        time: 1234,
+        metadata: { uid: "sandbox-from-ocsf" },
+      },
+    },
+  })));
+  assert.equal(item.ok, true);
+  if (!item.ok) return;
+  assert.equal(item.dataschema, "urn:openshell:event-envelope:1");
+  assert.deepEqual(item.data, {
+    ...OCSF,
+    time: 1234,
+    metadata: { uid: "sandbox-from-ocsf" },
+  });
+});
+
+test("adapts exporter WatchSandbox logs for Slack display and audit summaries", () => {
+  const [item] = parseCloudEventsBody(JSON.stringify(envelope({
+    dataschema: "urn:openshell:event-envelope:1",
+    data: {
+      openshell: { sandbox_id: "sandbox-123" },
+      original: {
+        timestamp_ms: "1788225606794",
+        level: "INFO",
+        message: "OCSF JSONL logging toggled",
+      },
+    },
+  })));
+  assert.equal(item.ok, true);
+  if (!item.ok) return;
+  assert.deepEqual(item.data, {
+    timestamp_ms: "1788225606794",
+    level: "INFO",
+    message: "OCSF JSONL logging toggled",
+    metadata: { uid: "sandbox-123" },
+    time: 1788225606794,
+    severity: "Informational",
+    severity_id: 1,
+  });
+});
+
+test("quarantines malformed exporter envelope-v1 without data.original", () => {
+  const [item] = parseCloudEventsBody(JSON.stringify(envelope({
+    dataschema: "urn:openshell:event-envelope:1",
+    data: { openshell: { sandbox_id: "sandbox-123" } },
+  })));
+  assert.equal(item.ok, false);
+  if (item.ok) return;
+  assert.match(item.error, /missing data\.original/);
 });
 
 test("parses a batch array into one item per envelope", () => {

@@ -1,0 +1,9 @@
+# Applies only to the fresh sandbox created by the quick-start guide.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /proc/self, /dev/urandom]
+  read_write: [/sandbox, /tmp, /dev/null]
+landlock:
+  compatibility: best_effort
+network_policies: {}

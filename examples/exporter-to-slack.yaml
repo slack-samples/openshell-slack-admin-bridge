@@ -1,0 +1,87 @@
+# Real local gateway + shared sandbox OCSF -> authenticated HTTPS -> Slack capture.
+# Paths are relative to /work in Docker. Preserve state and output on restart.
+extensions:
+  file_storage/checkpoints:
+    directory: ./state/checkpoints
+    create_directory: true
+  file_storage/queue:
+    directory: ./state/queue
+    create_directory: true
+  bearertokenauth/slack:
+    filename: ./secrets/capture-token
+  health_check:
+    endpoint: 127.0.0.1:13133
+
+receivers:
+  file_log/ocsf:
+    include: [/var/log/openshell/openshell-ocsf.*.log]
+    start_at: beginning
+    storage: file_storage/checkpoints
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    attributes:
+      openshell.acquisition.kind: ocsf.file
+      openshell.acquisition.source_instance: slack-ocsf
+    operators:
+      - type: json_parser
+        parse_from: body
+        parse_to: body
+  watchsandbox:
+    endpoint: https://localhost:17670
+    gateway_id: openshell
+    workspace: default
+    sandbox_names: [slack-live-demo]
+    token_env: ''
+    discovery_interval: 3s
+    tls:
+      ca_file: /run/secrets/gateway/ca.crt
+      cert_file: /run/secrets/gateway/tls.crt
+      key_file: /run/secrets/gateway/tls.key
+    policy_reconciliation:
+      enabled: true
+      interval: 1m
+      storage: file_storage/checkpoints
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 256
+    spike_limit_mib: 64
+  openshell:
+    source_profiles: [ocsf.file, watchsandbox, policy.reconciliation]
+    gateway_id: openshell
+    workspace: default
+    source_instance: slack-ocsf
+    validation:
+      mode: mark
+
+exporters:
+  cloudevents/slack:
+    endpoint: https://localhost:8090/v1/events
+    auth:
+      authenticator: bearertokenauth/slack
+    tls:
+      ca_file: ./secrets/capture.crt
+    default_source: openshell://openshell/default
+    retry_on_failure:
+      enabled: true
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      storage: file_storage/queue
+      queue_size: 1000
+      num_consumers: 1
+      block_on_overflow: true
+  file/recovery:
+    path: ./output/events.json
+    format: json
+    append: true
+
+service:
+  extensions: [file_storage/checkpoints, file_storage/queue, bearertokenauth/slack, health_check]
+  pipelines:
+    logs:
+      receivers: [file_log/ocsf, watchsandbox]
+      processors: [memory_limiter, openshell]
+      exporters: [cloudevents/slack, file/recovery]
