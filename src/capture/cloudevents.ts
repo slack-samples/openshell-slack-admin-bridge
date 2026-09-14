@@ -24,6 +24,7 @@ export interface ParsedEnvelopeOk {
   source: string | null;
   subject: string | null;
   time: string | null;
+  dataschema: string | null;
   // The decoded event payload — expected to be a flat OCSF object.
   data: unknown;
 }
@@ -42,6 +43,79 @@ function isObject(v: unknown): v is Record<string, unknown> {
 
 function asStringAttr(v: unknown): string | null {
   return typeof v === "string" ? v : null;
+}
+
+function asEpochMs(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+  return null;
+}
+
+function severityFromLogLevel(v: unknown): { severity: string; severity_id: number } | null {
+  if (typeof v !== "string") return null;
+  switch (v.trim().toUpperCase()) {
+    case "TRACE":
+    case "DEBUG":
+    case "INFO":
+      return { severity: "Informational", severity_id: 1 };
+    case "WARN":
+    case "WARNING":
+      return { severity: "Medium", severity_id: 3 };
+    case "ERROR":
+      return { severity: "High", severity_id: 4 };
+    case "CRITICAL":
+      return { severity: "Critical", severity_id: 5 };
+    case "FATAL":
+      return { severity: "Fatal", severity_id: 6 };
+    default:
+      return null;
+  }
+}
+
+// Compatibility adapter for the Research exporter's envelope-v1 payload:
+//   Existing Slack input: CloudEvent.data.class_uid
+//   Exporter input:       CloudEvent.data.original.class_uid
+// The original receiver decoded CloudEvents but passed data directly to the
+// OCSF normalizer. Passing the exporter wrapper there hides the nested OCSF
+// fields and produces "Unknown" display values even when delivery succeeds.
+// Unwrap here so normalization, filtering, cards, and App Home can keep using
+// their existing input shape. This does not collect events or run exporter code.
+function unwrapOpenShellEnvelope(data: Record<string, unknown>, cloudEventTime: string | null): unknown {
+  if (!("original" in data)) return null;
+  if (!isObject(data.original)) return data.original;
+
+  const original = data.original;
+  // Copy the payload before adding display context; do not mutate the received
+  // envelope. The exporter remains responsible for upstream redaction.
+  const adapted: Record<string, unknown> = { ...original };
+  const openshell = isObject(data.openshell) ? data.openshell : {};
+
+  const existingMetadata = isObject(original.metadata) ? original.metadata : {};
+  // Slack groups sandbox activity by metadata.uid. Prefer an existing string;
+  // otherwise use exporter context, then the operational log's sandbox_id.
+  if (asStringAttr(existingMetadata.uid) === null) {
+    const sandboxId = asStringAttr(openshell.sandbox_id) ?? asStringAttr(original.sandbox_id);
+    if (sandboxId) adapted.metadata = { ...existingMetadata, uid: sandboxId };
+  }
+
+  // WatchSandbox logs use timestamp_ms instead of OCSF time. Use CloudEvents
+  // time only as the final fallback; leave a valid original OCSF time intact.
+  if (asEpochMs(original.time) === null) {
+    const sourceTime = asEpochMs(original.timestamp_ms);
+    const envelopeTime = cloudEventTime ? Date.parse(cloudEventTime) : Number.NaN;
+    if (sourceTime !== null) adapted.time = sourceTime;
+    else if (Number.isFinite(envelopeTime)) adapted.time = envelopeTime;
+  }
+
+  // Operational logs may carry level rather than an OCSF severity label.
+  // With no string label, a recognized level supplies both severity fields
+  // (including replacing severity_id if present); unknown levels stay unmapped.
+  if (asStringAttr(original.severity) === null) {
+    const mapped = severityFromLogLevel(original.level);
+    if (mapped) Object.assign(adapted, mapped);
+  }
+
+  return adapted;
 }
 
 // Parse one already-JSON-decoded CloudEvents envelope value. Reusable for binary
@@ -77,13 +151,31 @@ export function parseEnvelope(value: unknown): ParsedEnvelope {
     data = value.data ?? null;
   }
 
+  const time = asStringAttr(value.time);
+  const dataschema = asStringAttr(value.dataschema);
+  // Opt in only for the exporter's declared schema. Bare OCSF CloudEvents and
+  // other schemas retain the previous path, even if they contain "original".
+  if (dataschema === "urn:openshell:event-envelope:1") {
+    // A declared envelope without its source record cannot be adapted; report
+    // it as malformed instead of rendering the wrapper as an empty OCSF event.
+    if (!isObject(data) || !("original" in data)) {
+      return {
+        ok: false,
+        error: "OpenShell event envelope is missing data.original",
+        raw: value,
+      };
+    }
+    data = unwrapOpenShellEnvelope(data, time);
+  }
+
   return {
     ok: true,
     type,
     id: asStringAttr(value.id),
     source: asStringAttr(value.source),
     subject: asStringAttr(value.subject),
-    time: asStringAttr(value.time),
+    time,
+    dataschema,
     data,
   };
 }
