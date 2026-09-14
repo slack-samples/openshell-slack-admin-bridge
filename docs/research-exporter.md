@@ -1,8 +1,8 @@
 # NVIDIA Research exporter integration
 
 The audit receiver supports the experimental [OpenShell Event Exporter](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/openshell-exporter)
-under `projects/openshell-exporter/`. The quick start pins the tested, merged
-commit `26dbfd52730429695670c27a0ec0449a851e755c` from that repository's `main`.
+under `projects/openshell-exporter/`. The quick start builds the latest merged
+code from that repository's `main`, without a fixed exporter commit or version.
 No pull-request checkout is required.
 The exporter runs separately; the bridge does not vendor or execute its Go code.
 
@@ -66,10 +66,11 @@ does not use Slack tokens, mount live exporter state, or call the Slack API.
 
 ## Experimental limitations
 
-The pinned merged source includes delivery/privacy fixes and regressions for
-original-log-attribute redaction and discovery cleanup. The example retains the
+The example retains the
 normalized `openshell` pipeline; it does not adopt `http.config.yaml`, which intentionally bypasses
 normalization/redaction. Synthetic validation does not qualify sensitive data,
-production capacity, every source lane, or ARM64 runtime operation. For future updates, intentionally update
-the source pin and fixtures, rebuild, and repeat verification; do not track a
-moving branch silently.
+production capacity, every source lane, or ARM64 runtime operation. Because
+`main` changes over time, a newer build is not automatically verified by earlier
+tests. Pull the latest source, rebuild, review any configuration or wire-contract
+changes, and repeat verification before replacing a running exporter. The image's
+revision label records the source commit used for each build.

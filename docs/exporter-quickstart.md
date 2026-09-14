@@ -43,8 +43,7 @@ export DEMO_WORKSPACE="default"
 export SANDBOX_NAME="slack-live-demo"
 export OCSF_VOLUME="slack-live-ocsf"
 export GATEWAY_MTLS="$HOME/.config/openshell/gateways/$GATEWAY/mtls"
-export EXPORTER_REF="26dbfd52730429695670c27a0ec0449a851e755c"
-export EXPORTER_IMAGE="openshell-exporter:slack-26dbfd5"
+export EXPORTER_IMAGE="openshell-exporter:slack-latest"
 mkdir -p "$QUICKSTART_ROOT"
 ```
 
@@ -219,28 +218,58 @@ sandboxes must actually have the log mount. The supervisor writes
 `openshell-ocsf.*.log` into this volume. The exporter mounts the same volume
 read-only at `/var/log/openshell`; no guessed host log paths or manual copying.
 
-## 5. Build the exporter from merged source
+## 5. Get the latest exporter source and build the image
 
 The exporter lives in [NVIDIA/OpenShell-Research](https://github.com/NVIDIA/OpenShell-Research/tree/main/projects/openshell-exporter).
-`EXPORTER_REF` pins a tested commit already merged into that repository's `main`.
+Use the latest merged code on that repository's `main` branch, with
+`projects/openshell-exporter/` as the build context. There is no fixed exporter
+commit or release version in this guide.
 No pull-request branch or NVIDIA-published exporter image is required.
 
-For a **new** checkout/build:
+For a **new** checkout:
 
 ```bash
-git clone https://github.com/NVIDIA/OpenShell-Research.git "$EXPORTER_SRC" &&
-git -C "$EXPORTER_SRC" checkout --detach "$EXPORTER_REF" &&
+git clone --branch main --single-branch https://github.com/NVIDIA/OpenShell-Research.git "$EXPORTER_SRC"
+```
+
+For an **existing** checkout, inspect its remote, branch, and local changes first:
+
+```bash
+git -C "$EXPORTER_SRC" remote -v
+git -C "$EXPORTER_SRC" status --short --branch
+```
+
+Only update a clean checkout on `main` whose `origin` is
+`https://github.com/NVIDIA/OpenShell-Research.git` (or its SSH equivalent):
+
+```bash
+if [ -z "$(git -C "$EXPORTER_SRC" status --porcelain)" ] && \
+   [ "$(git -C "$EXPORTER_SRC" branch --show-current)" = main ]; then
+  git -C "$EXPORTER_SRC" pull --ff-only origin main
+else
+  echo "STOP: preserve this checkout; use a new EXPORTER_SRC directory and clone main there."
+fi
+```
+
+If updating fails or the checkout has local commits, use a new directory and
+clone `main` there; do not reset or discard local work. After a successful clone
+or update, build the image:
+
+```bash
+export EXPORTER_REF="$(git -C "$EXPORTER_SRC" rev-parse HEAD)"
 docker build --platform linux/amd64 \
-  --build-arg VERSION=0.0.5-rc.1 \
+  --build-arg VERSION=main \
   --build-arg VCS_REF="$EXPORTER_REF" \
   -t "$EXPORTER_IMAGE" "$EXPORTER_SRC/projects/openshell-exporter"
 ```
 
-For an existing checkout, inspect `git -C "$EXPORTER_SRC" status --short --branch`
-and `git -C "$EXPORTER_SRC" rev-parse HEAD` first. Preserve local work; choose
-another checkout directory if needed. If the desired image exists, skip
-rebuilding. The build context is the exporter subdirectory, not the Research
-root. Docker Desktop uses emulation for this `linux/amd64` build on Apple Silicon.
+`EXPORTER_REF` records the revision actually built for traceability; it does not
+select an old revision. `VERSION=main` is image metadata, not a release pin.
+The local `slack-latest` tag does not update itself: pull and rebuild whenever
+you want newer exporter code. An already-running container keeps its old image
+until explicitly replaced; preserve its configuration, secrets, and state mounts
+when doing so. Repeat the real-event verification after each update.
+Docker Desktop uses emulation for this `linux/amd64` build on Apple Silicon.
 
 ## 6. Run the exporter on ordinary Docker networking
 

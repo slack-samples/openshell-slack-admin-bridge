@@ -43,7 +43,7 @@ For a manual, step-by-step local gateway → exporter → Slack setup using ordi
 Docker Desktop bridge networking, see the [exporter quick start](docs/exporter-quickstart.md).
 For audit ingestion from NVIDIA's Research exporter, see the
 [Research exporter integration guide](docs/research-exporter.md). It covers the
-pinned source build, envelope-v1 adapter, TLS/bearer setup, and a synthetic
+latest-main source build, envelope-v1 adapter, TLS/bearer setup, and a synthetic
 end-to-end verification that does not post to Slack.
 
 ### 1. Slack app
