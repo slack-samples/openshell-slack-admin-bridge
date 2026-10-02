@@ -1,10 +1,45 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { Receiver, splitBind } from "../../src/capture/receiver";
 import { createIngestor, type AuditSink } from "../../src/capture/pipeline";
 import type { RenderedAudit } from "../../src/capture/blocks";
 
 const TOKEN = "s3cret-token";
+
+// Apache-2.0 example from NVIDIA/OpenShell-Research PR #66, commit
+// 116fb82adad70a37c2669143e278e31c5e343895; see fixture README for provenance.
+const researchEvent = JSON.parse(readFileSync(
+  join(__dirname, "../fixtures/research-exporter/ocsf-network-denial.json"), "utf8",
+));
+
+test("Research exporter batch reaches Slack rendering with sandbox identity and source detail", async () => {
+  await withReceiver(async ({ url, posted }) => {
+    const res = await post(url, JSON.stringify([researchEvent]), {
+      "content-type": "application/cloudevents-batch+json",
+    });
+    assert.equal(res.status, 202);
+    assert.deepEqual(await res.json(), { ok: true, posted: 1, filtered: 0, dropped: 0, bad: 0 });
+    assert.equal(posted.length, 1);
+    const rendered = JSON.stringify(posted[0]);
+    assert.match(rendered, /sandbox-123/);
+    assert.match(rendered, /CONNECT denied api\.example\.com:443/);
+    assert.match(rendered, /request-123/);
+    assert.doesNotMatch(rendered, /observed_time/);
+  });
+});
+
+test("Research exporter retries are requested when the Slack queue cannot accept a batch", async () => {
+  await withReceiver(async ({ url }) => {
+    const res = await post(url, JSON.stringify([researchEvent]), {
+      "content-type": "application/cloudevents-batch+json",
+    });
+    assert.equal(res.status, 503);
+    assert.equal((await res.json() as { dropped: number }).dropped, 1);
+    assert.ok(res.headers.get("retry-after"));
+  }, { sink: () => false });
+});
 
 interface Harness {
   url: string;

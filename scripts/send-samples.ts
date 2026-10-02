@@ -1,14 +1,16 @@
 /**
- * Inject sample egress-approval proposals into a RUNNING mock OpenShell gateway, so a live
+ * Inject sample egress-approval proposals into a RUNNING mock or trusted local demo gateway, so a live
  * bridge posts approval cards and populates App Home. Uses the same SubmitPolicyAnalysis RPC an
  * in-sandbox agent would. Safe to run repeatedly; each run appends new pending chunks.
  *
  *   node --import tsx scripts/send-samples.ts
  *   MOCK_ADDR=127.0.0.1:17670 node --import tsx scripts/send-samples.ts
  *
- * Requires the mock (scripts/run-mock.ts) and, to see cards, the bridge to be running.
+ * For a real local demo, supply SAMPLE_SANDBOX_TOKEN_FILE with that sandbox's
+ * identity. This helper uses plaintext gRPC: never send a token to an untrusted
+ * remote MOCK_ADDR. Requires the gateway and, to see cards, the bridge running.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as grpc from "@grpc/grpc-js";
 import * as protoLoader from "@grpc/proto-loader";
@@ -95,10 +97,17 @@ function loadClient(): grpc.Client & Record<string, (...a: unknown[]) => unknown
 }
 
 async function main(): Promise<void> {
+  const metadata = new grpc.Metadata();
+  if (process.env.SAMPLE_SANDBOX_TOKEN_FILE) {
+    const token = readFileSync(process.env.SAMPLE_SANDBOX_TOKEN_FILE, "utf8").trim();
+    if (!token) throw new Error("Sandbox token file is empty");
+    metadata.set("authorization", `Bearer ${token}`);
+  }
   const client = loadClient();
   const req = { name: SANDBOX, proposed_chunks: proposedChunks, analysis_mode: "agent_authored", workspace: "default" };
   const res = await new Promise<{ accepted_chunk_ids?: string[]; accepted_chunks?: number }>((resolvePromise, reject) => {
-    client.SubmitPolicyAnalysis(req, (err: grpc.ServiceError | null, r: unknown) => (err ? reject(err) : resolvePromise(r as never)));
+    client.SubmitPolicyAnalysis(req, metadata, { deadline: Date.now() + 15_000 },
+      (err: grpc.ServiceError | null, r: unknown) => (err ? reject(err) : resolvePromise(r as never)));
   });
   log.info(
     { sandbox: SANDBOX, accepted: res.accepted_chunks, chunkIds: res.accepted_chunk_ids, rules: proposedChunks.map((c) => c.rule_name) },

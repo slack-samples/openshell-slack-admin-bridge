@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { WebClient } from "@slack/web-api";
+import { createSlackPoster } from "./capture/slack-poster";
 import { loadConfig, captureEnabled, hasCaptureSource } from "./config";
 import { childLogger } from "./logger";
 import { SendQueue } from "./capture/send-queue";
@@ -39,19 +39,11 @@ async function main(): Promise<void> {
   let queue: SendQueue | null = null;
   let sink: AuditSink;
   if (auditChannel) {
-    const web = new WebClient(config.slack.botToken);
     queue = new SendQueue({
-      post: async (msg) => {
-        // unfurl_links/media off: audit cards carry egress hostnames and URLs we
-        // do not want expanded in-channel.
-        await web.chat.postMessage({
-          channel: auditChannel,
-          text: msg.text,
-          blocks: msg.blocks,
-          unfurl_links: false,
-          unfurl_media: false,
-        });
-      },
+      post: createSlackPoster(config.slack.botToken, auditChannel, (receipt) => {
+        // Record Slack's acknowledgement, never message bodies or credentials.
+        log.info(receipt, "Audit message delivered to Slack.");
+      }),
     });
     queue.start();
     const q = queue;

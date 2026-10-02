@@ -39,6 +39,13 @@ OpenShell gateway  <--gRPC-->  Bridge  <--Socket Mode-->  Slack
 
 ## Setup
 
+For a manual, step-by-step local gateway → exporter → Slack setup using ordinary
+Docker Desktop bridge networking, see the [exporter quick start](docs/exporter-quickstart.md).
+For audit ingestion from NVIDIA's Research exporter, see the
+[Research exporter integration guide](docs/research-exporter.md). It covers the
+latest-main source build, envelope-v1 adapter, TLS/bearer setup, and a synthetic
+end-to-end verification that does not post to Slack.
+
 ### 1. Slack app
 
 Create the app from [`manifest.json`](./manifest.json): [api.slack.com/apps](https://api.slack.com/apps)
