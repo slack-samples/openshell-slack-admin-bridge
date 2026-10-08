@@ -45,7 +45,7 @@
     "@slack/bolt": "^5.1.0",
     "@slack/web-api": "^8.2.0",
     "dotenv": "^17.4.2",
-    "pino": "^10.3.1",
+    "pino": "^10.4.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {
