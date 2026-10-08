@@ -43,7 +43,7 @@
     "@grpc/grpc-js": "^1.14.5",
     "@grpc/proto-loader": "^0.8.1",
     "@slack/bolt": "^5.1.0",
-    "@slack/web-api": "^8.1.1",
+    "@slack/web-api": "^8.2.0",
     "dotenv": "^17.4.2",
     "pino": "^10.3.1",
     "yaml": "^2.9.1"
